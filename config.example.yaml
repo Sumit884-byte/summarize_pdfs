@@ -1,0 +1,17 @@
+# Copy to config.yaml and adjust paths for your machine.
+# data_dir: where processed output, chroma index, and cache live
+data_dir: data
+
+# Optional: point raw PDFs at an external folder (e.g. shared stats library)
+# raw_dir: /path/to/your/textbooks-and-exams
+
+llm:
+  provider: arka
+  model: arka
+  task: pdf
+  skill: summarize_pdfs
+
+supermemory:
+  enabled: true
+  mode: local
+  container: summarize_pdfs

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "summarize-pdfs"
+version = "0.1.0"
+description = "Exam-guided RAG pipeline for textbook study at scale"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "chromadb>=0.5.0",
+    "openai>=1.40.0",
+    "pymupdf>=1.24.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    "pyyaml>=6.0",
+    "rich>=13.7.0",
+    "sentence-transformers>=3.0.0",
+    "tenacity>=8.3.0",
+    "typer>=0.12.0",
+    "json-repair>=0.30.0",
+]
+
+[project.optional-dependencies]
+ocr = ["pytesseract>=0.3.10", "pdf2image>=1.17.0"]
+arka = ["arka-agent[chat]"]
+
+[project.scripts]
+summarize-pdfs = "summarize_pdfs.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]

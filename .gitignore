@@ -1,0 +1,35 @@
+# Virtual environment
+.venv/
+venv/
+
+# Environment and secrets
+.env
+.env.local
+
+# Local config (may contain personal paths)
+config.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Project data (PDFs, outputs, vector store)
+data/
+*.pdf
+
+# Chroma / embedding cache
+**/chroma/
+*.chroma
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
