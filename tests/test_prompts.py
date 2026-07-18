@@ -40,6 +40,7 @@ def test_synthesize_prompt_structure():
     prompt = synthesize_user_prompt(question, concepts, [])
     assert "where_clause" in prompt
     assert "has_formula" in prompt
+    assert '"facts"' in prompt
     assert "QUESTION N" not in prompt or "NOT" in prompt
     assert "plain text" in prompt.lower()
 
@@ -67,6 +68,7 @@ def test_concept_prompt_no_mechanical_steps():
 def test_expand_prompt_includes_formula_glossary():
     prompt = expand_topic_user_prompt("Descriptive Statistics", "", [], textbook_name="OpenStax")
     assert "where_clause" in prompt
+    assert '"facts"' in prompt
     assert "OpenStax" in prompt or "textbook" in prompt.lower()
 
 

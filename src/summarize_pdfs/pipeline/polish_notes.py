@@ -11,7 +11,7 @@ from summarize_pdfs.config import AppConfig, Settings
 from summarize_pdfs.export.dedupe_notes import deduplicate_study_notes
 from summarize_pdfs.export.plaintext import sanitize_plaintext
 from summarize_pdfs.export.summary import TOPIC_ORDER
-from summarize_pdfs.pipeline.llm import LLMClient, chat_json, make_llm_client, map_concurrent
+from summarize_pdfs.pipeline.llm import LLMClient, chat_json, coerce_json_dict, make_llm_client, map_concurrent
 from summarize_pdfs.pipeline.prompts import POLISH_NOTES_SYSTEM, polish_notes_prompt
 
 console = Console()
@@ -19,9 +19,11 @@ console = Console()
 _TOPIC_HEADER_RE = re.compile(r"^(.+?) — Quick Notes\s*$")
 _BULLET_START_RE = re.compile(r"^(?:•|\s+where\b)", re.I)
 _WHERE_LINE_RE = re.compile(r"^\s*where\b", re.I)
+_SECTION_HEADER_RE = re.compile(r"^(?:Key Facts|Formulas):\s*$", re.I)
 
 
-def _extract_polished_text(data: dict) -> str:
+def _extract_polished_text(data: object) -> str:
+    data = coerce_json_dict(data)
     if not data:
         return ""
     for key in ("polished_text", "text", "content"):
@@ -44,6 +46,9 @@ def _normalize_section_bullets(text: str) -> str:
             lines.append("")
             continue
         if _TOPIC_HEADER_RE.match(stripped):
+            lines.append(stripped)
+            continue
+        if _SECTION_HEADER_RE.match(stripped):
             lines.append(stripped)
             continue
         if _WHERE_LINE_RE.match(stripped):

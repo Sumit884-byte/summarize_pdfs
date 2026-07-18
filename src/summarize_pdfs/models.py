@@ -98,6 +98,7 @@ class StudyAnswer(BaseModel):
     steps: list[str] = Field(default_factory=list)
     definitions: list[DefinitionItem] = Field(default_factory=list)
     formulas: list[FormulaItem] = Field(default_factory=list)
+    facts: list[str] = Field(default_factory=list)
     tricks: list[str] = Field(default_factory=list)
     reasoning: list[str] = Field(default_factory=list)
     skipped: bool = False

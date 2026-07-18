@@ -8,6 +8,7 @@ from rich.console import Console
 
 from summarize_pdfs.config import AppConfig, Settings
 from summarize_pdfs.export.formula_glossary import render_formula_lines
+from summarize_pdfs.export.topic_facts import canonical_facts_for_topic
 from summarize_pdfs.export.plaintext import sanitize_plaintext
 from summarize_pdfs.export.notes import export_notes_file
 from summarize_pdfs.export.summary import TOPIC_ORDER, export_summary_file
@@ -22,36 +23,51 @@ _TOPIC_QUERIES: dict[str, list[str]] = {
         "mean median mode variance standard deviation",
         "measures of center and spread sample statistics",
         "quartiles percentiles box plot outliers",
+        "key facts properties mean sensitive outliers median robust",
+        "sample vs population descriptive statistics important notes",
     ],
     "Probability & Conditional Probability": [
         "probability rules conditional probability independence",
         "Bayes theorem prior posterior probability",
         "complement rule at least one event",
+        "key facts probability range 0 to 1 mutually exclusive independent",
+        "properties conditional probability sample space",
     ],
     "Combinatorics & Counting": [
         "permutations combinations factorial counting",
         "multiplication rule arrangements with restrictions",
+        "key facts order matters permutation combination replacement",
+        "properties counting with without replacement",
     ],
     "Correlation & Association": [
         "correlation coefficient scatter plot association",
         "linear correlation Pearson r",
+        "key facts correlation causation association strength direction",
+        "properties contingency table categorical variables",
     ],
     "Data Types & Study Design": [
         "nominal ordinal interval ratio data types",
         "sampling methods random sample population",
         "cross sectional time series study design",
+        "key facts measurement scales nominal ordinal interval ratio",
+        "properties study design sampling bias",
     ],
     "Frequency & Distribution": [
         "frequency distribution histogram cumulative frequency",
         "IQR interquartile range quartiles",
+        "key facts relative frequency cumulative distribution outliers",
+        "properties histogram distribution shape",
     ],
     "Transformations of Data": [
         "linear transformation mean variance standard deviation",
         "effect of adding constant multiplying data",
+        "key facts linear transform mean standard deviation shift scale",
+        "properties adding constant multiplying data spread",
     ],
     "Exam Skills (MCQ / MSQ / SA)": [
         "interpreting multiple choice statistics questions",
         "choosing correct statistical method",
+        "key facts exam strategies complement rule at least one",
     ],
 }
 
@@ -197,6 +213,37 @@ def _render_expanded_topic(topic: str, data: dict) -> list[str]:
     label = topic.split(" (")[0].upper() if " (" in topic else topic.upper()
     lines = [f"{label} — Quick Notes", ""]
 
+    seen_fact_keys: set[str] = set()
+    topic_facts: list[str] = []
+    for fact in canonical_facts_for_topic(topic):
+        key = fact.strip().lower()[:80]
+        if key not in seen_fact_keys:
+            seen_fact_keys.add(key)
+            topic_facts.append(fact)
+    for item in _as_dict_items(data.get("facts")):
+        text = sanitize_plaintext(item.get("text", "") or item.get("name", ""))
+        page = item.get("page", "")
+        suffix = f" [p.{page}]" if page else ""
+        if text:
+            key = text.strip().lower()[:80]
+            if key not in seen_fact_keys:
+                seen_fact_keys.add(key)
+                topic_facts.append(f"{text.rstrip('.')}{suffix}")
+    for fact in _as_str_items(data.get("facts")):
+        text = sanitize_plaintext(fact.strip())
+        if text:
+            key = text.strip().lower()[:80]
+            if key not in seen_fact_keys:
+                seen_fact_keys.add(key)
+                topic_facts.append(text)
+
+    if topic_facts:
+        lines.append("Key Facts:")
+        for fact in topic_facts:
+            lines.append(f"• {fact.rstrip('.')}")
+        lines.append("")
+
+    formula_block: list[str] = []
     for item in _as_dict_items(data.get("formulas")):
         expr = _formula_text(item)
         page = item.get("page", "")
@@ -205,7 +252,12 @@ def _render_expanded_topic(topic: str, data: dict) -> list[str]:
             rendered = render_formula_lines(expr)
             if suffix and rendered:
                 rendered[0] = f"{rendered[0]}{suffix}"
-            lines.extend(rendered)
+            formula_block.extend(rendered)
+
+    if formula_block:
+        lines.append("Formulas:")
+        lines.extend(formula_block)
+        lines.append("")
 
     for item in _as_dict_items(data.get("definitions")):
         text = sanitize_plaintext(item.get("text", "") or item.get("description", ""))
@@ -271,6 +323,30 @@ def _render_expanded_summary_topic(topic: str, data: dict, existing_summary: str
     summary = sanitize_plaintext((data.get("summary_paragraph") or "").strip())
     if summary:
         lines.append(summary)
+        lines.append("")
+
+    seen_fact_keys: set[str] = set()
+    summary_facts: list[str] = []
+    for fact in canonical_facts_for_topic(topic):
+        key = fact.strip().lower()[:80]
+        if key not in seen_fact_keys:
+            seen_fact_keys.add(key)
+            summary_facts.append(fact)
+    for item in _as_dict_items(data.get("facts")):
+        text = sanitize_plaintext(item.get("text", "") or item.get("name", ""))
+        page = item.get("page", "")
+        suffix = f" (p. {page})" if page else ""
+        if text:
+            key = text.strip().lower()[:80]
+            if key not in seen_fact_keys:
+                seen_fact_keys.add(key)
+                summary_facts.append(f"{text.rstrip('.')}{suffix}.")
+
+    if summary_facts:
+        lines.append("Key facts for this topic:")
+        lines.append("")
+        for fact in summary_facts:
+            lines.append(f"  • {fact.rstrip('.')}.")
         lines.append("")
 
     if _as_dict_items(data.get("definitions")):
@@ -387,7 +463,7 @@ async def expand_study_notes(
         topic_summary = _extract_topic_section(existing_summary, topic)
         has_expansion = topic in by_topic and any(
             by_topic[topic].get(k)
-            for k in ("definitions", "formulas", "tricks", "corrections", "summary_paragraph")
+            for k in ("facts", "definitions", "formulas", "tricks", "corrections", "summary_paragraph")
         )
 
         if topic_notes:

@@ -6,6 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from summarize_pdfs.export.formula_glossary import render_formula_lines
+from summarize_pdfs.export.topic_facts import canonical_facts_for_topic
 from summarize_pdfs.export.plaintext import sanitize_plaintext
 from summarize_pdfs.models import ConceptGraph, ExamQuestion, StudyAnswer
 from summarize_pdfs.pipeline.cooccurrence import cluster_topic_order, load_concept_graph, render_cluster_section
@@ -336,6 +337,26 @@ class _TopicBucket:
 def _render_topic(bucket: _TopicBucket) -> list[str]:
     lines: list[str] = [bucket.name, "-" * len(bucket.name), ""]
 
+    all_facts: list[str] = []
+    seen_fact_keys: set[str] = set()
+    for fact in canonical_facts_for_topic(bucket.name):
+        key = _dedupe_key(fact)
+        if key not in seen_fact_keys:
+            seen_fact_keys.add(key)
+            all_facts.append(fact)
+    for fact in sorted(bucket.facts.values(), key=str.lower):
+        key = _dedupe_key(fact)
+        if key not in seen_fact_keys:
+            seen_fact_keys.add(key)
+            all_facts.append(fact)
+
+    if all_facts:
+        lines.append("Key facts for this topic:")
+        lines.append("")
+        for fact in all_facts[:12]:
+            lines.append(f"  • {fact.rstrip('.')}.")
+        lines.append("")
+
     if bucket.definitions:
         lines.append(
             "The following definitions and relationships come up repeatedly in the exam papers."
@@ -368,13 +389,6 @@ def _render_topic(bucket: _TopicBucket) -> list[str]:
                 continue
             seen_norm.add(norm)
             lines.extend(render_formula_lines(formula, bullet="  • ", indent="    "))
-        lines.append("")
-
-    if bucket.facts:
-        lines.append("Important facts and conditions to remember:")
-        lines.append("")
-        for fact in sorted(bucket.facts.values(), key=str.lower)[:12]:
-            lines.append(f"  • {fact.rstrip('.')}.")
         lines.append("")
 
     if bucket.methods:
@@ -434,6 +448,9 @@ def _ingest_answer(
         bucket.add_definition(concept.name, concept.description)
         for formula in concept.formulas:
             bucket.add_formula(formula)
+
+    for fact in answer.facts:
+        bucket.add_fact(fact)
 
     extra_formulas, facts, prose = _parse_explanation(answer.explanation)
     for formula in extra_formulas:

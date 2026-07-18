@@ -63,6 +63,19 @@ DEFINITIONS:
 - Each definition must stand alone as a proper sentence ending with a period.
 """.strip()
 
+FACTS_RULES = """
+BRANCH FACTS (mandatory per topic):
+- Include facts[]: short factual statements about the statistical branch — NOT formulas, NOT definitions.
+- Facts describe properties, relationships, conditions, and exam-relevant truths for the topic.
+- Examples of facts (not formulas):
+  • Mean is sensitive to outliers; median is robust
+  • Probability always ranges from 0 to 1
+  • Order matters → permutation; order doesn't → combination
+  • Correlation measures association, not causation
+- Do NOT put formulas in facts[] — use formulas[] for expressions with = signs.
+- Do NOT put one-line term definitions in facts[] — use definitions[] for those.
+""".strip()
+
 FULL_SUMMARY_RULES = """
 FULL SUMMARY MODE (study_guide_complete.txt):
 - Topic-organized prose with definitions, formulas (verbatim), and conceptual reasoning.
@@ -89,6 +102,7 @@ QUALITY_STANDARDS = "\n\n".join(
         FORMULA_RULES,
         FORMULA_AWARENESS,
         DEFINITION_RULES,
+        FACTS_RULES,
         FULL_SUMMARY_RULES,
         QUICK_NOTES_RULES,
         BOILERPLATE_SKIP_RULES,
@@ -142,6 +156,8 @@ POLISH_NOTES_SYSTEM = (
     + FORMULA_AWARENESS
     + "\n\n"
     + DEFINITION_RULES
+    + "\n\n"
+    + FACTS_RULES
     + "\n\n"
     + QUICK_NOTES_RULES
 )
@@ -236,6 +252,9 @@ Source excerpts (copy formulas and definitions VERBATIM; cite page numbers):
 Return JSON:
 {{
   "skip": false,
+  "facts": [
+    "short branch-level factual statement — properties, conditions, relationships (NOT formulas)"
+  ],
   "definitions": [
     {{
       "name": "term",
@@ -258,6 +277,7 @@ Return JSON:
 
 Rules:
 {QUALITY_STANDARDS}
+- Include facts[] with 2-5 branch-relevant factual statements drawn from excerpts.
 - Do NOT include worked step-by-step calculations with specific numbers.
 - Do NOT use Q&A-style headers or per-question dump formatting in explanation.
 - List every formula, definition, and fact needed — err on completeness.
@@ -286,6 +306,9 @@ Textbook excerpts:
 
 Return JSON:
 {{
+  "facts": [
+    {{"text": "branch-level factual statement (not a formula or definition)", "page": 123}}
+  ],
   "definitions": [
     {{"name": "term", "text": "complete full-sentence definition", "page": 123}}
   ],
@@ -308,6 +331,7 @@ Return JSON:
 
 Rules:
 {QUALITY_STANDARDS}
+- Include facts[] with 3-6 branch-level factual statements from textbook excerpts (properties, conditions, key truths).
 - Use textbook excerpts as authoritative; fix wrong formulas.
 - Always include page numbers from excerpts.
 - Quick-notes fields: formulas + tricks + one-line defs only — no worked examples.
@@ -330,7 +354,9 @@ Return JSON:
 }}
 
 Polish rules:
-- Merge duplicate formulas and definitions (keep the clearest, most complete version).
+- Merge duplicate formulas, definitions, and facts (keep the clearest, most complete version).
+- Preserve a "Key Facts:" subsection with branch-level factual bullets (not formulas).
+- Preserve a "Formulas:" subsection with formula bullets and where-clauses.
 - Improve clarity and flow while preserving EVERY fact, formula, trick, and page citation.
 - Every formula MUST keep or add a where-clause defining ALL variables on the next line
   (indented with two spaces, starting with "where ").
@@ -339,10 +365,12 @@ Polish rules:
 - Never leave formula-backed concepts as bare definitions — pair Def: with • formula lines.
 {FORMULA_AWARENESS}
 - Add brief cross-links where helpful (e.g. P(D|B) relates to Bayes' theorem, conditional probability).
-- Compact cheat-sheet style: bullet lines starting with • for formulas, Def:, Trick:, Fix:.
+- Compact cheat-sheet style: section headers "Key Facts:" and "Formulas:" then bullet lines.
+- Bullet lines starting with • for formulas; Def:, Trick:, Fix: for other items.
 - NO worked examples, NO numeric step-by-step calculations, NO multi-step numeric solutions.
 - Keep textbook page citations like [p.217] when present.
 - Start the section with: "{topic_name.split(' (')[0].upper()} — Quick Notes" then a blank line.
+- Then "Key Facts:" subsection (3-6 bullets), blank line, "Formulas:" subsection, then Def:/Trick: bullets.
 - Output plain text inside polished_text — use × for multiplication, … for ellipsis, no LaTeX or escapes.
 - Do NOT drop content; err on completeness over brevity.
 """

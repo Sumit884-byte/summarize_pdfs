@@ -10,7 +10,7 @@ from summarize_pdfs.models import (
     RetrievedQuote,
     StudyAnswer,
 )
-from summarize_pdfs.pipeline.llm import LLMClient, chat_json
+from summarize_pdfs.pipeline.llm import LLMClient, chat_json, coerce_json_dict
 from summarize_pdfs.pipeline.prompts import SYSTEM_JSON, synthesize_user_prompt
 
 
@@ -70,18 +70,20 @@ async def synthesize_answer(
     config: AppConfig,
     prior_context: str = "",
 ) -> StudyAnswer:
-    data = await chat_json(
-        client,
-        model=config.llm.model,
-        prompt=synthesize_user_prompt(
-            question,
-            concepts,
-            quotes,
-            prior_context=prior_context,
-        ),
-        temperature=config.llm.temperature,
-        cache_dir=config.cache_dir,
-        system_prompt=SYSTEM_JSON,
+    data = coerce_json_dict(
+        await chat_json(
+            client,
+            model=config.llm.model,
+            prompt=synthesize_user_prompt(
+                question,
+                concepts,
+                quotes,
+                prior_context=prior_context,
+            ),
+            temperature=config.llm.temperature,
+            cache_dir=config.cache_dir,
+            system_prompt=SYSTEM_JSON,
+        )
     )
 
     if data.get("skip"):
@@ -99,12 +101,15 @@ async def synthesize_answer(
 
     definitions = _parse_definitions(data.get("definitions"))
     formulas = _parse_formulas(data.get("formulas"))
+    facts = [sanitize_plaintext(f) for f in _as_str_list(data.get("facts"))]
     tricks = [sanitize_plaintext(t) for t in _as_str_list(data.get("tricks"))]
     reasoning = [sanitize_plaintext(r) for r in _as_str_list(data.get("reasoning"))]
     explanation = sanitize_plaintext(str(data.get("explanation") or ""))
 
     # Backward compatibility: legacy LLM responses with key_facts / steps
-    if not definitions:
+    if not facts:
+        facts = [sanitize_plaintext(f) for f in _as_str_list(data.get("key_facts"))]
+    if not definitions and not data.get("facts"):
         definitions = _parse_definitions(data.get("key_facts"))
     legacy_steps = _as_str_list(data.get("steps"))
     if not reasoning and legacy_steps:
@@ -119,6 +124,7 @@ async def synthesize_answer(
         steps=legacy_steps,
         definitions=definitions,
         formulas=formulas,
+        facts=facts,
         tricks=tricks,
         reasoning=reasoning,
     )

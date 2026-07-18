@@ -9,6 +9,7 @@ from summarize_pdfs.export.formula_glossary import (
     formulas_for_concept,
     render_formula_lines,
 )
+from summarize_pdfs.export.topic_facts import canonical_facts_for_topic
 from summarize_pdfs.export.plaintext import sanitize_plaintext
 from summarize_pdfs.export.summary import (
     TOPIC_ORDER,
@@ -222,9 +223,22 @@ def _formula_to_trick(formula: str) -> str | None:
 class _NotesBucket:
     def __init__(self, name: str) -> None:
         self.name = name
+        self.facts: dict[str, str] = {}
         self.formulas: dict[str, str] = {}
         self.definitions: dict[str, str] = {}
         self.tips: dict[str, str] = {}
+
+    def add_fact(self, fact: str) -> None:
+        fact = sanitize_plaintext(fact.strip())
+        if not fact or _is_junk(fact) or _is_worked_content(fact):
+            return
+        if _is_valid_formula(fact):
+            self.add_formula(fact)
+            return
+        if fact.lower().startswith("def:"):
+            self.add_definition("", fact[4:].strip())
+            return
+        self.facts[_dedupe_key(fact)] = fact
 
     def add_formula(self, formula: str) -> None:
         formula = sanitize_plaintext(formula.strip())
@@ -270,7 +284,7 @@ class _NotesBucket:
         self.tips[_dedupe_key(tip)] = tip
 
     def is_empty(self) -> bool:
-        return not (self.formulas or self.definitions or self.tips)
+        return not (self.facts or self.formulas or self.definitions or self.tips)
 
 
 def _extract_question_patterns(
@@ -324,12 +338,14 @@ def _ingest_notes(
         for formula in concept.formulas:
             bucket.add_formula(formula)
 
+    for fact in answer.facts:
+        bucket.add_fact(fact)
+
     extra_formulas, facts, _prose = _parse_explanation(answer.explanation)
     for formula in extra_formulas:
         bucket.add_formula(formula)
     for fact in facts:
-        if _is_tip_candidate(fact):
-            bucket.add_tip(fact)
+        bucket.add_fact(fact)
 
     for trick in answer.tricks:
         bucket.add_tip(trick)
@@ -358,14 +374,35 @@ def _render_notes_topic(bucket: _NotesBucket) -> list[str]:
     label = _short_topic_label(bucket.name)
     lines: list[str] = [f"{label} — Quick Notes", ""]
 
+    seen_fact_keys: set[str] = set()
+    canonical_facts = canonical_facts_for_topic(bucket.name)
+    topic_facts: list[str] = []
+    for fact in canonical_facts:
+        key = _dedupe_key(fact)
+        if key not in seen_fact_keys:
+            seen_fact_keys.add(key)
+            topic_facts.append(fact)
+    for fact in sorted(bucket.facts.values(), key=str.lower):
+        key = _dedupe_key(fact)
+        if key not in seen_fact_keys:
+            seen_fact_keys.add(key)
+            topic_facts.append(fact)
+
+    if topic_facts:
+        lines.append("Key Facts:")
+        for fact in topic_facts:
+            lines.append(f"• {fact.rstrip('.')}")
+        lines.append("")
+
     seen_norm: set[str] = set()
+    formula_lines: list[str] = []
     for formula in canonical_formulas_for_topic(bucket.name):
         lhs = formula.split("=")[0] if "=" in formula else formula
         norm = re.sub(r"\s+", "", _normalize(lhs.replace("×", "*")))[:30]
         if norm in seen_norm:
             continue
         seen_norm.add(norm)
-        lines.extend(render_formula_lines(formula))
+        formula_lines.extend(render_formula_lines(formula))
 
     for formula in sorted(
         bucket.formulas.values(),
@@ -376,7 +413,12 @@ def _render_notes_topic(bucket: _NotesBucket) -> list[str]:
         if norm in seen_norm:
             continue
         seen_norm.add(norm)
-        lines.extend(render_formula_lines(formula))
+        formula_lines.extend(render_formula_lines(formula))
+
+    if formula_lines:
+        lines.append("Formulas:")
+        lines.extend(formula_lines)
+        lines.append("")
 
     for definition in sorted(bucket.definitions.values(), key=str.lower):
         if not definition.lower().startswith("def:"):
@@ -422,7 +464,7 @@ def render_notes_txt(
         "STATISTICS FOR DATA SCIENCE — QUICK STUDY NOTES",
         "=" * 48,
         "",
-        "Compact reference: formulas, one-line definitions, tricks & question patterns.",
+        "Compact reference: key facts, formulas, one-line definitions, tricks & question patterns.",
         f"From {kept} substantive entries ({skipped} boilerplate omitted). No worked examples.",
         "",
     ]
@@ -440,7 +482,11 @@ def render_notes_txt(
         t
         for t in topic_order
         if t in buckets
-        and (canonical_formulas_for_topic(t) or not buckets[t].is_empty())
+        and (
+            canonical_formulas_for_topic(t)
+            or canonical_facts_for_topic(t)
+            or not buckets[t].is_empty()
+        )
     ]
     for topic in ordered_topics:
         lines.extend(_render_notes_topic(buckets[topic]))

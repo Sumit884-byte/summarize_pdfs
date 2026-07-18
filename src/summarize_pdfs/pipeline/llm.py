@@ -117,6 +117,48 @@ def _parse_json_text(content: str) -> dict:
             return {}
 
 
+def coerce_json_dict(data: object) -> dict:
+    """Merge list-of-dict LLM responses into one object."""
+    if isinstance(data, dict):
+        return data
+    if not isinstance(data, list):
+        return {}
+
+    merged: dict = {}
+    list_keys = frozenset(
+        {
+            "concepts",
+            "definitions",
+            "formulas",
+            "tricks",
+            "reasoning",
+            "steps",
+            "key_facts",
+            "facts",
+            "quotes_used",
+            "search_queries",
+            "co_occurring_groups",
+            "corrections",
+            "questions",
+        }
+    )
+    for item in data:
+        if isinstance(item, dict):
+            for key, value in item.items():
+                clean_key = key.replace("\\_", "_")
+                if clean_key in list_keys and isinstance(value, list):
+                    merged.setdefault(clean_key, []).extend(value)
+                elif clean_key not in merged or merged[clean_key] in (None, "", False):
+                    merged[clean_key] = value
+        elif isinstance(item, list):
+            for sub in item:
+                if isinstance(sub, str) and sub.strip():
+                    merged.setdefault("search_queries", []).append(sub.strip())
+        elif isinstance(item, str) and item.strip() and "explanation" not in merged:
+            merged["explanation"] = item.strip()
+    return merged
+
+
 def _arka_complete_sync(client: ArkaLLMClient, system: str, user: str, temperature: float) -> str:
     try:
         from arka.llm.fallback import llm_complete

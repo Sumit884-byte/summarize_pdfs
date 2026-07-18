@@ -7,6 +7,61 @@ from summarize_pdfs.pipeline.llm import LLMClient, chat_json
 from summarize_pdfs.pipeline.prompts import SYSTEM_CONCEPT_EXTRACTION, concept_extraction_user_prompt
 
 
+def _normalize_concept_payload(data: object) -> dict:
+    """Accept dict or mixed list payloads from LLM JSON."""
+    if isinstance(data, dict):
+        return _sanitize_concept_dict(data)
+
+    if isinstance(data, list):
+        concepts: list[dict] = []
+        search_queries: list[str] = []
+        co_occurring_groups: list = []
+
+        for item in data:
+            if isinstance(item, dict):
+                if "concepts" in item:
+                    inner = _sanitize_concept_dict(item)
+                    concepts.extend(inner.get("concepts") or [])
+                    search_queries.extend(inner.get("search_queries") or [])
+                    co_occurring_groups.extend(inner.get("co_occurring_groups") or [])
+                elif _concept_field(item, "name"):
+                    concepts.append(item)
+            elif isinstance(item, list):
+                for sub in item:
+                    if isinstance(sub, str) and sub.strip():
+                        search_queries.append(sub.strip())
+            elif isinstance(item, str) and item.strip():
+                search_queries.append(item.strip())
+
+        return {
+            "concepts": concepts,
+            "search_queries": search_queries,
+            "co_occurring_groups": co_occurring_groups,
+        }
+
+    return {}
+
+
+def _concept_field(item: dict, key: str):
+    """Read concept fields; LLM sometimes escapes underscores in keys."""
+    if key in item:
+        return item[key]
+    escaped = key.replace("_", "\\_")
+    return item.get(escaped)
+
+
+def _sanitize_concept_dict(data: dict) -> dict:
+    concepts = [c for c in (data.get("concepts") or []) if isinstance(c, dict)]
+    co_groups = data.get("co_occurring_groups")
+    if co_groups is None:
+        co_groups = data.get("co\\_occurring\\_groups") or []
+    return {
+        "concepts": concepts,
+        "search_queries": list(data.get("search_queries") or []),
+        "co_occurring_groups": co_groups,
+    }
+
+
 async def extract_concepts(
     question: ExamQuestion,
     *,
@@ -21,11 +76,14 @@ async def extract_concepts(
         cache_dir=config.cache_dir,
         system_prompt=SYSTEM_CONCEPT_EXTRACTION,
     )
+    data = _normalize_concept_payload(data)
     concepts = []
     for c in data.get("concepts", []):
-        name = c.get("name", "concept")
-        formulas = list(c.get("formulas") or [])
-        has_formula = bool(c.get("has_formula"))
+        if not isinstance(c, dict):
+            continue
+        name = _concept_field(c, "name") or "concept"
+        formulas = list(_concept_field(c, "formulas") or [])
+        has_formula = bool(_concept_field(c, "has_formula"))
         if not formulas and (has_formula or formulas_for_concept(name)):
             formulas = formulas_for_concept(name)
             has_formula = bool(formulas)
