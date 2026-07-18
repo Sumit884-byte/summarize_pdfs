@@ -20,13 +20,27 @@ build/
 .mypy_cache/
 .ruff_cache/
 
-# Project data (PDFs, outputs, vector store)
+# Project data — PDFs, textbooks, exams, outputs (never commit)
 data/
 *.pdf
 
-# Chroma / embedding cache
+# Generated study material
+study_notes*.txt
+study_guide*.txt
+study_guide*.json
+study_guide*.md
+expand_notes_manifest.json
+
+# Pipeline output directories
+output/
+processed/
+cache/
+chroma/
 **/chroma/
 *.chroma
+
+# Personal / external data paths (do not commit)
+**/dev/stats/
 
 # IDE
 .idea/
