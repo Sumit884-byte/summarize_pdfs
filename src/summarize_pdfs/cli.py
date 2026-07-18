@@ -20,12 +20,14 @@ from summarize_pdfs.pipeline.expand_notes import expand_study_notes
 from summarize_pdfs.pipeline.polish_notes import polish_study_notes
 from summarize_pdfs.pipeline.llm import llm_is_configured
 from summarize_pdfs.pipeline.runner import (
+    build_concept_graph_from_questions,
     generate_study_guide,
     index_textbooks,
     parse_exams,
     produce_study_materials,
     run_full_pipeline,
 )
+from summarize_pdfs.pipeline.cooccurrence import load_concept_graph, render_cluster_section
 
 app = typer.Typer(
     name="summarize-pdfs",
@@ -64,6 +66,52 @@ def index_cmd(
     console.print(f"Indexed [bold]{new_chunks}[/bold] new chunks ([bold]{total}[/bold] total)")
     for w in warnings[:5]:
         console.print(f"[yellow]![/yellow] {w}")
+
+
+@app.command("concept-graph")
+def concept_graph_cmd(
+    config_path: Path = typer.Option(Path("config.yaml"), "--config", "-c"),
+    rebuild: bool = typer.Option(False, "--rebuild", help="Force re-extraction of concepts"),
+) -> None:
+    """Build or display co-occurrence map from parsed exam questions."""
+    config = load_config(config_path)
+    if not llm_is_configured(config, Settings()):
+        console.print("[red]No LLM configured — cannot extract concepts[/red]")
+        raise typer.Exit(1)
+
+    questions = load_questions(config.questions_db)
+    if not questions:
+        console.print("[red]No questions found — run parse-exams first[/red]")
+        raise typer.Exit(1)
+
+    if rebuild or not config.concept_graph_path.exists():
+        asyncio.run(build_concept_graph_from_questions(config, questions))
+    else:
+        console.print(f"[dim]Using existing graph at {config.concept_graph_path}[/dim]")
+
+    graph = load_concept_graph(config.concept_graph_path)
+    if graph is None:
+        console.print("[red]Failed to load concept graph[/red]")
+        raise typer.Exit(1)
+
+    table = Table(title="Concept Co-occurrence Clusters")
+    table.add_column("Cluster")
+    table.add_column("Questions", justify="right")
+    for cluster in graph.concept_clusters[:20]:
+        table.add_row(cluster.display_name, str(cluster.question_count))
+    console.print(table)
+
+    if graph.pair_counts:
+        console.print(f"\nTop co-occurring pairs (threshold ≥ {graph.threshold}):")
+        pairs = sorted(graph.pair_counts.items(), key=lambda item: (-item[1], item[0]))[:15]
+        for key, count in pairs:
+            left, right = key.split("|||", 1)
+            console.print(f"  • {left.title()} + {right.title()} ({count})")
+
+    console.print(f"\nSaved → {config.concept_graph_path}")
+    for line in render_cluster_section(graph):
+        if line.startswith("•"):
+            console.print(line)
 
 
 @app.command("parse-exams")

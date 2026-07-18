@@ -2,6 +2,7 @@ from summarize_pdfs.pipeline.prompts import (
     PLAINTEXT_OUTPUT_RULES,
     POLISH_NOTES_SYSTEM,
     QUALITY_STANDARDS,
+    SYSTEM_CONCEPT_EXTRACTION,
     SYSTEM_JSON,
     concept_extraction_user_prompt,
     exam_parse_user_prompt,
@@ -43,6 +44,11 @@ def test_synthesize_prompt_structure():
     assert "plain text" in prompt.lower()
 
 
+def test_concept_system_prompt_co_occurrence():
+    assert "Co-occurring Concepts" in SYSTEM_CONCEPT_EXTRACTION
+    assert "co_occurring_groups" in SYSTEM_CONCEPT_EXTRACTION
+
+
 def test_concept_prompt_no_mechanical_steps():
     question = ExamQuestion(
         question_id="q1",
@@ -53,6 +59,7 @@ def test_concept_prompt_no_mechanical_steps():
     )
     prompt = concept_extraction_user_prompt(question)
     assert "search_queries" in prompt
+    assert "co_occurring_groups" in prompt
     assert "has_formula" in prompt
     assert "Find P(A|B)" in prompt
 

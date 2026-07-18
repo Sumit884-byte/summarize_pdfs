@@ -44,6 +44,7 @@ class AppConfig(BaseModel):
     supermemory: SupermemoryConfig = Field(default_factory=SupermemoryConfig)
     exam_batch_size: int = 10
     index_workers: int = 4
+    cooccurrence_threshold: int = 2
 
     @property
     def source_dir(self) -> Path:
@@ -68,6 +69,14 @@ class AppConfig(BaseModel):
     @property
     def questions_db(self) -> Path:
         return self.processed_dir / "questions.jsonl"
+
+    @property
+    def concept_graph_path(self) -> Path:
+        return self.processed_dir / "concept_graph.json"
+
+    @property
+    def concept_extractions_path(self) -> Path:
+        return self.processed_dir / "concept_extractions.jsonl"
 
     def ensure_dirs(self) -> None:
         for path in (

@@ -108,6 +108,8 @@ SYSTEM_JSON = (
 SYSTEM_CONCEPT_EXTRACTION = (
     "You are a statistics exam analyst. "
     "Identify concepts, formulas, and definitions a student must master. "
+    "If a question requires combining multiple distinct concepts, explicitly group them as "
+    "Co-occurring Concepts in co_occurring_groups. "
     "Always respond with valid JSON only.\n\n"
     + PLAINTEXT_OUTPUT_RULES
     + "\n\n"
@@ -177,11 +179,18 @@ Return JSON:
       "formulas": ["standard formula expression — REQUIRED when has_formula is true"]
     }}
   ],
+  "co_occurring_groups": [
+    ["Concept A", "Concept B"],
+    ["Concept C", "Concept D", "Concept E"]
+  ],
   "search_queries": ["3-5 short retrieval queries for OpenStax/textbook lookup"]
 }}
 
 Rules:
 - Focus on statistical concepts, not exam metadata or administrative steps.
+- If the question requires combining multiple distinct concepts, group them in co_occurring_groups.
+- Each co_occurring_groups entry must list 2+ concept names that must be used together for this question.
+- Use concept names that match the concepts[].name labels where possible.
 - Definitions must be complete sentences (no truncation).
 - Set has_formula: true for every concept with a standard formula (percentile, median, variance, etc.).
 - When has_formula is true, formulas MUST be non-empty with the standard expression and implied variables.

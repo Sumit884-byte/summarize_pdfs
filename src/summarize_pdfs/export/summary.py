@@ -7,7 +7,8 @@ from pathlib import Path
 
 from summarize_pdfs.export.formula_glossary import render_formula_lines
 from summarize_pdfs.export.plaintext import sanitize_plaintext
-from summarize_pdfs.models import ExamQuestion, StudyAnswer
+from summarize_pdfs.models import ConceptGraph, ExamQuestion, StudyAnswer
+from summarize_pdfs.pipeline.cooccurrence import cluster_topic_order, load_concept_graph, render_cluster_section
 
 _BOILERPLATE_RE = re.compile(
     r"(?:"
@@ -456,6 +457,8 @@ def _ingest_answer(
 def render_summary_txt(
     answers: list[StudyAnswer],
     questions: list[ExamQuestion] | None = None,
+    *,
+    concept_graph: ConceptGraph | None = None,
 ) -> str:
     """Render study answers as cohesive topic-organized prose summary."""
     by_id = {q.question_id: q for q in (questions or [])}
@@ -483,7 +486,11 @@ def render_summary_txt(
         "",
     ]
 
-    ordered_topics = [t for t in TOPIC_ORDER if t in buckets and not buckets[t].is_empty()]
+    if concept_graph:
+        lines.extend(render_cluster_section(concept_graph))
+
+    topic_order = cluster_topic_order(concept_graph, TOPIC_ORDER)
+    ordered_topics = [t for t in topic_order if t in buckets and not buckets[t].is_empty()]
     for topic in ordered_topics:
         lines.extend(_render_topic(buckets[topic]))
         lines.append("")
@@ -522,9 +529,12 @@ def export_summary_file(
     json_path: Path,
     output_path: Path,
     questions_path: Path | None = None,
+    *,
+    concept_graph_path: Path | None = None,
 ) -> Path:
     answers = load_answers_from_json(json_path)
     questions = load_questions_from_jsonl(questions_path) if questions_path else None
-    text = render_summary_txt(answers, questions)
+    concept_graph = load_concept_graph(concept_graph_path) if concept_graph_path else None
+    text = render_summary_txt(answers, questions, concept_graph=concept_graph)
     output_path.write_text(text)
     return output_path

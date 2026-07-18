@@ -65,6 +65,20 @@ class ConceptExtraction(BaseModel):
     question_id: str
     concepts: list[ConceptItem]
     search_queries: list[str] = Field(default_factory=list)
+    co_occurring_groups: list[list[str]] = Field(default_factory=list)
+
+
+class ConceptCluster(BaseModel):
+    concepts: list[str]
+    display_name: str
+    question_count: int
+
+
+class ConceptGraph(BaseModel):
+    pair_counts: dict[str, int] = Field(default_factory=dict)
+    concept_clusters: list[ConceptCluster] = Field(default_factory=list)
+    question_groups: dict[str, list[list[str]]] = Field(default_factory=dict)
+    threshold: int = 2
 
 
 class RetrievedQuote(BaseModel):

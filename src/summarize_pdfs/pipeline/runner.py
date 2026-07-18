@@ -23,8 +23,15 @@ from summarize_pdfs.export.summary import export_summary_file
 from summarize_pdfs.ingest.pdf_extractor import extract_pages, ingest_pdf, ocr_sanity_check, save_manifest, write_ocr_report
 from summarize_pdfs.index.vector_store import VectorStore
 from summarize_pdfs.memory.store import StudyMemory
-from summarize_pdfs.models import DocType, ExamQuestion, PipelineRun, StudyAnswer, TextChunk
+from summarize_pdfs.models import ConceptExtraction, DocType, ExamQuestion, PipelineRun, StudyAnswer, TextChunk
 from summarize_pdfs.pipeline.concept_extractor import extract_concepts
+from summarize_pdfs.pipeline.cooccurrence import (
+    build_concept_graph,
+    load_concept_extractions,
+    load_concept_graph,
+    save_concept_extractions,
+    save_concept_graph,
+)
 from summarize_pdfs.pipeline.expand_notes import expand_study_notes
 from summarize_pdfs.pipeline.polish_notes import polish_study_notes
 from summarize_pdfs.pipeline.llm import llm_is_configured, make_llm_client, map_concurrent
@@ -141,10 +148,20 @@ async def _process_question(
     client,
     config: AppConfig,
     memory: StudyMemory | None = None,
+    *,
+    concepts: ConceptExtraction | None = None,
+    concept_graph=None,
 ) -> StudyAnswer:
-    concepts = await extract_concepts(question, client=client, config=config)
+    if concepts is None:
+        concepts = await extract_concepts(question, client=client, config=config)
     prior_context = memory.context_for_question(question, concepts) if memory else ""
-    quotes = retrieve_for_question(question, concepts, store, config)
+    quotes = retrieve_for_question(
+        question,
+        concepts,
+        store,
+        config,
+        concept_graph=concept_graph,
+    )
     answer = await synthesize_answer(
         question,
         concepts,
@@ -156,6 +173,52 @@ async def _process_question(
     if memory:
         memory.remember_answer(question, answer)
     return answer
+
+
+async def build_concept_graph_from_questions(
+    config: AppConfig,
+    questions: list[ExamQuestion] | None = None,
+    *,
+    client=None,
+) -> list[ConceptExtraction]:
+    """Extract concepts for all questions and persist co-occurrence graph."""
+    settings = Settings()
+    if client is None:
+        client = make_llm_client(config, settings)
+
+    if questions is None:
+        questions = load_questions(config.questions_db)
+
+    questions = [q for q in questions if not is_boilerplate_question(q.text)]
+    if not questions:
+        raise RuntimeError("No exam questions found. Run `parse-exams` first.")
+
+    extractions: list[ConceptExtraction] = await map_concurrent(
+        [extract_concepts(q, client=client, config=config) for q in questions],
+        limit=config.llm.max_concurrent,
+    )
+    graph = build_concept_graph(extractions, threshold=config.cooccurrence_threshold)
+    save_concept_graph(graph, config.concept_graph_path)
+    save_concept_extractions(extractions, config.concept_extractions_path)
+    console.print(
+        f"[green]Concept graph[/green] → {config.concept_graph_path} "
+        f"({len(graph.pair_counts)} pairs, {len(graph.concept_clusters)} clusters)"
+    )
+    return extractions
+
+
+def _load_cached_extractions(
+    config: AppConfig,
+    questions: list[ExamQuestion],
+) -> list[ConceptExtraction] | None:
+    cached = load_concept_extractions(config.concept_extractions_path)
+    if not cached:
+        return None
+    expected_ids = {q.question_id for q in questions}
+    cached_ids = {item.question_id for item in cached}
+    if expected_ids != cached_ids:
+        return None
+    return cached
 
 
 async def generate_study_guide(
@@ -179,10 +242,36 @@ async def generate_study_guide(
     if not questions:
         raise RuntimeError("No exam questions found. Run `parse-exams` first.")
 
+    console.print("[dim]Extracting concepts and building co-occurrence graph...[/dim]")
+    extractions = _load_cached_extractions(config, questions)
+    if extractions is None:
+        extractions = await build_concept_graph_from_questions(
+            config,
+            questions,
+            client=client,
+        )
+    else:
+        graph = build_concept_graph(extractions, threshold=config.cooccurrence_threshold)
+        save_concept_graph(graph, config.concept_graph_path)
+        console.print(f"[dim]Using cached concept extractions ({len(extractions)} questions)[/dim]")
+    extraction_by_id = {ext.question_id: ext for ext in extractions}
+    concept_graph = load_concept_graph(config.concept_graph_path)
+
     groups = group_questions_by_topic(questions)
     console.print(f"Processing {len(questions)} questions across {len(groups)} topics")
 
-    coros = [_process_question(q, store, client, config, memory) for q in questions]
+    coros = [
+        _process_question(
+            q,
+            store,
+            client,
+            config,
+            memory,
+            concepts=extraction_by_id.get(q.question_id),
+            concept_graph=concept_graph,
+        )
+        for q in questions
+    ]
     answers: list[StudyAnswer] = await map_concurrent(
         coros,
         limit=config.llm.max_concurrent,
@@ -200,10 +289,11 @@ async def generate_study_guide(
 
     questions_path = config.processed_dir / "questions.jsonl"
     q_path = questions_path if questions_path.exists() else None
+    graph_path = config.concept_graph_path if config.concept_graph_path.exists() else None
     complete_path = config.output_dir / "study_guide_complete.txt"
     notes_path = config.output_dir / "study_notes.txt"
-    export_summary_file(json_path, complete_path, q_path)
-    export_notes_file(json_path, notes_path, q_path)
+    export_summary_file(json_path, complete_path, q_path, concept_graph_path=graph_path)
+    export_notes_file(json_path, notes_path, q_path, concept_graph_path=graph_path)
 
     console.print(f"[green]JSON[/green] → {json_path}")
     console.print(f"[green]Summary[/green] → {complete_path}")
@@ -305,7 +395,7 @@ async def produce_study_materials_async(
     console.print("[bold]Step 2/5[/bold] Parsing exams...")
     questions = await parse_exams_async(config, use_llm=use_llm_parse)
 
-    console.print("[bold]Step 3/5[/bold] Generating study guide (quality prompts)...")
+    console.print("[bold]Step 3/5[/bold] Generating study guide (concepts → co-occurrence → RAG)...")
     answers, json_path = await generate_study_guide(config, topic=topic, limit=limit)
 
     console.print("[bold]Step 4/5[/bold] Exported topic-organized summary + quick notes")

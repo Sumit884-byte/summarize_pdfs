@@ -41,4 +41,18 @@ async def extract_concepts(
         question_id=question.question_id,
         concepts=concepts,
         search_queries=data.get("search_queries") or [],
+        co_occurring_groups=_parse_co_occurring_groups(data.get("co_occurring_groups")),
     )
+
+
+def _parse_co_occurring_groups(raw) -> list[list[str]]:
+    if not raw:
+        return []
+    groups: list[list[str]] = []
+    for group in raw:
+        if not isinstance(group, list):
+            continue
+        names = [str(name).strip() for name in group if str(name).strip()]
+        if len(names) >= 2:
+            groups.append(names)
+    return groups
