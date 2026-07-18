@@ -14,6 +14,7 @@ from summarize_pdfs.export.notes import export_notes_file
 from summarize_pdfs.export.summary import TOPIC_ORDER, export_summary_file
 from summarize_pdfs.index.vector_store import VectorStore
 from summarize_pdfs.pipeline.llm import LLMClient, chat_json, make_llm_client
+from summarize_pdfs.pipeline.cooccurrence import load_concept_graph, render_cluster_section
 from summarize_pdfs.pipeline.prompts import SYSTEM_EXPAND, expand_topic_user_prompt
 
 console = Console()
@@ -422,10 +423,12 @@ async def expand_study_notes(
     summary_path = summary_path or out_dir / "study_guide_complete.txt"
 
     questions_path = config.processed_dir / "questions.jsonl"
+    q_path = questions_path if questions_path.exists() else None
+    graph_path = config.concept_graph_path if config.concept_graph_path.exists() else None
     baseline_notes_path = out_dir / "study_notes_baseline.txt"
     baseline_summary_path = out_dir / "study_guide_baseline.txt"
-    export_notes_file(json_path, baseline_notes_path, questions_path if questions_path.exists() else None)
-    export_summary_file(json_path, baseline_summary_path, questions_path if questions_path.exists() else None)
+    export_notes_file(json_path, baseline_notes_path, q_path, concept_graph_path=graph_path)
+    export_summary_file(json_path, baseline_summary_path, q_path, concept_graph_path=graph_path)
 
     existing_notes = baseline_notes_path.read_text()
     existing_summary = baseline_summary_path.read_text()
@@ -456,7 +459,12 @@ async def expand_study_notes(
     by_topic = {topic: _normalize_expansion(data) for topic, data in zip(topics, expanded)}
 
     notes_lines = _render_expanded_notes_header(textbook_name, chunk_count)
+    concept_graph = load_concept_graph(graph_path) if graph_path else None
+    if concept_graph:
+        notes_lines.extend(render_cluster_section(concept_graph))
     summary_lines = _render_expanded_summary_header(textbook_name)
+    if concept_graph:
+        summary_lines.extend(render_cluster_section(concept_graph))
 
     for topic in TOPIC_ORDER:
         topic_notes = _existing_topic_notes(existing_notes, topic)
