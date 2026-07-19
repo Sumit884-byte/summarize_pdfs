@@ -8,7 +8,6 @@ from rich.console import Console
 
 from summarize_pdfs.config import AppConfig, Settings
 from summarize_pdfs.export.formula_glossary import render_formula_lines
-from summarize_pdfs.export.topic_facts import canonical_facts_for_topic
 from summarize_pdfs.export.plaintext import sanitize_plaintext
 from summarize_pdfs.export.notes import export_notes_file
 from summarize_pdfs.export.summary import TOPIC_ORDER, export_summary_file
@@ -21,7 +20,9 @@ console = Console()
 
 _TOPIC_QUERIES: dict[str, list[str]] = {
     "Descriptive Statistics": [
+        "descriptive inferential statistics branches population sample",
         "mean median mode variance standard deviation",
+        "mean categorical nominal data when mean does not exist",
         "measures of center and spread sample statistics",
         "quartiles percentiles box plot outliers",
         "key facts properties mean sensitive outliers median robust",
@@ -48,6 +49,8 @@ _TOPIC_QUERIES: dict[str, list[str]] = {
     ],
     "Data Types & Study Design": [
         "nominal ordinal interval ratio data types",
+        "mean categorical nominal data mode not mean",
+        "descriptive inferential statistics branches",
         "sampling methods random sample population",
         "cross sectional time series study design",
         "key facts measurement scales nominal ordinal interval ratio",
@@ -60,9 +63,10 @@ _TOPIC_QUERIES: dict[str, list[str]] = {
         "properties histogram distribution shape",
     ],
     "Transformations of Data": [
-        "linear transformation mean variance standard deviation",
-        "effect of adding constant multiplying data",
-        "key facts linear transform mean standard deviation shift scale",
+        "linear transformation mean median variance standard deviation",
+        "effect of adding constant multiplying data median",
+        "multiplying all data by constant effect on median mean",
+        "key facts linear transform mean median standard deviation shift scale",
         "properties adding constant multiplying data spread",
     ],
     "Exam Skills (MCQ / MSQ / SA)": [
@@ -216,11 +220,6 @@ def _render_expanded_topic(topic: str, data: dict) -> list[str]:
 
     seen_fact_keys: set[str] = set()
     topic_facts: list[str] = []
-    for fact in canonical_facts_for_topic(topic):
-        key = fact.strip().lower()[:80]
-        if key not in seen_fact_keys:
-            seen_fact_keys.add(key)
-            topic_facts.append(fact)
     for item in _as_dict_items(data.get("facts")):
         text = sanitize_plaintext(item.get("text", "") or item.get("name", ""))
         page = item.get("page", "")
@@ -328,11 +327,6 @@ def _render_expanded_summary_topic(topic: str, data: dict, existing_summary: str
 
     seen_fact_keys: set[str] = set()
     summary_facts: list[str] = []
-    for fact in canonical_facts_for_topic(topic):
-        key = fact.strip().lower()[:80]
-        if key not in seen_fact_keys:
-            seen_fact_keys.add(key)
-            summary_facts.append(fact)
     for item in _as_dict_items(data.get("facts")):
         text = sanitize_plaintext(item.get("text", "") or item.get("name", ""))
         page = item.get("page", "")

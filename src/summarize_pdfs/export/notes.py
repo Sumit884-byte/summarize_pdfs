@@ -375,13 +375,7 @@ def _render_notes_topic(bucket: _NotesBucket) -> list[str]:
     lines: list[str] = [f"{label} — Quick Notes", ""]
 
     seen_fact_keys: set[str] = set()
-    canonical_facts = canonical_facts_for_topic(bucket.name)
     topic_facts: list[str] = []
-    for fact in canonical_facts:
-        key = _dedupe_key(fact)
-        if key not in seen_fact_keys:
-            seen_fact_keys.add(key)
-            topic_facts.append(fact)
     for fact in sorted(bucket.facts.values(), key=str.lower):
         key = _dedupe_key(fact)
         if key not in seen_fact_keys:

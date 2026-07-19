@@ -105,7 +105,6 @@ def test_notes_injects_formula_for_percentile_definition():
     bucket = _NotesBucket("Descriptive Statistics")
     bucket.add_definition("percentile", "value below which a given percentage of data falls")
     text = "\n".join(_render_notes_topic(bucket))
-    assert "Key Facts:" in text
     assert "Formulas:" in text
     assert "percentile" in text.lower()
     assert "i = (p/100)" in text or "Percentile position" in text

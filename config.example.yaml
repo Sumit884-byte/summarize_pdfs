@@ -5,6 +5,9 @@ data_dir: data
 # Optional: point raw PDFs at an external folder (e.g. shared stats library)
 # raw_dir: /path/to/your/textbooks-and-exams
 
+# Study guides & notes output (default: data_dir/output). Use a path inside this repo:
+notes_dir: output
+
 llm:
   provider: arka
   model: arka

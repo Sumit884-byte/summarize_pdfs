@@ -6,7 +6,6 @@ from collections import defaultdict
 from pathlib import Path
 
 from summarize_pdfs.export.formula_glossary import render_formula_lines
-from summarize_pdfs.export.topic_facts import canonical_facts_for_topic
 from summarize_pdfs.export.plaintext import sanitize_plaintext
 from summarize_pdfs.models import ConceptGraph, ExamQuestion, StudyAnswer
 from summarize_pdfs.pipeline.cooccurrence import cluster_topic_order, load_concept_graph, render_cluster_section
@@ -339,11 +338,6 @@ def _render_topic(bucket: _TopicBucket) -> list[str]:
 
     all_facts: list[str] = []
     seen_fact_keys: set[str] = set()
-    for fact in canonical_facts_for_topic(bucket.name):
-        key = _dedupe_key(fact)
-        if key not in seen_fact_keys:
-            seen_fact_keys.add(key)
-            all_facts.append(fact)
     for fact in sorted(bucket.facts.values(), key=str.lower):
         key = _dedupe_key(fact)
         if key not in seen_fact_keys:

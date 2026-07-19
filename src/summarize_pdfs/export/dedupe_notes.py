@@ -5,6 +5,7 @@ import re
 from summarize_pdfs.export.summary import TOPIC_ORDER
 
 _TOPIC_HEADER_RE = re.compile(r"^(.+?) — Quick Notes\s*$")
+_SECTION_HEADER_RE = re.compile(r"^(?:Key Facts|Formulas):\s*$", re.I)
 _WHERE_LINE_RE = re.compile(r"^\s*where\b", re.I)
 
 _JUNK_LINE_RE = re.compile(
@@ -78,19 +79,75 @@ def _render_blocks(blocks: list[tuple[str, str | None]]) -> list[str]:
     return lines
 
 
-def deduplicate_within_section(lines: list[str]) -> list[str]:
-    blocks = _parse_blocks(lines)
-    seen: set[str] = set()
+def _dedupe_block_list(
+    blocks: list[tuple[str, str | None]],
+    *,
+    seen: set[str] | None = None,
+    global_formula_keys: set[str] | None = None,
+) -> list[tuple[str, str | None]]:
+    local_seen = seen if seen is not None else set()
     kept: list[tuple[str, str | None]] = []
     for bullet, where in blocks:
         key = _normalize_key(bullet)
         if where:
             key = f"{key}|{_normalize_key(where)[:80]}"
-        if key in seen:
+        if key in local_seen:
             continue
-        seen.add(key)
+        is_formula = "=" in bullet and not re.search(r"^•\s*Def:", bullet, re.I)
+        if global_formula_keys is not None and is_formula and key in global_formula_keys:
+            continue
+        local_seen.add(key)
+        if global_formula_keys is not None and is_formula:
+            global_formula_keys.add(key)
         kept.append((bullet, where))
-    return _render_blocks(kept)
+    return kept
+
+
+def deduplicate_within_section(
+    lines: list[str],
+    *,
+    global_formula_keys: set[str] | None = None,
+) -> list[str]:
+    """Dedupe bullets within a topic section, preserving Key Facts:/Formulas: subheaders."""
+    result: list[str] = []
+    trailing: list[str] = []
+    i = 0
+
+    def append_deduped(chunk: list[str]) -> None:
+        if not chunk:
+            return
+        deduped = _render_blocks(
+            _dedupe_block_list(_parse_blocks(chunk), global_formula_keys=global_formula_keys)
+        )
+        if deduped:
+            result.extend(deduped)
+
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+        if _SECTION_HEADER_RE.match(stripped):
+            append_deduped(trailing)
+            trailing = []
+            result.append(stripped)
+            result.append("")
+            i += 1
+            chunk: list[str] = []
+            while i < len(lines):
+                nxt = lines[i]
+                if _SECTION_HEADER_RE.match(nxt.strip()) or _TOPIC_HEADER_RE.match(nxt):
+                    break
+                chunk.append(nxt)
+                i += 1
+            append_deduped(chunk)
+            continue
+        if _TOPIC_HEADER_RE.match(line):
+            break
+        if stripped:
+            trailing.append(line)
+        i += 1
+
+    append_deduped(trailing)
+    return result
 
 
 def deduplicate_study_notes(text: str, *, global_formulas: bool = True) -> str:
@@ -125,24 +182,9 @@ def deduplicate_study_notes(text: str, *, global_formulas: bool = True) -> str:
             continue
         section_lines = sections[topic]
         header = section_lines[0] if section_lines else f"{topic.upper()} — Quick Notes"
-        body = deduplicate_within_section(section_lines[1:])
-
-        if global_formulas:
-            filtered: list[str] = [header, ""]
-            blocks = _parse_blocks(body)
-            for bullet, where in blocks:
-                fkey = _normalize_key(bullet)
-                is_formula = "=" in bullet and not re.search(r"^•\s*Def:", bullet, re.I)
-                if is_formula and fkey in global_formula_keys:
-                    continue
-                if is_formula:
-                    global_formula_keys.add(fkey)
-                filtered.append(bullet)
-                if where:
-                    filtered.append(where)
-            polished_sections[topic] = filtered
-        else:
-            polished_sections[topic] = [header, ""] + body
+        formula_keys = global_formula_keys if global_formulas else None
+        body = deduplicate_within_section(section_lines[1:], global_formula_keys=formula_keys)
+        polished_sections[topic] = [header, ""] + body
 
     out: list[str] = []
     if doc_header:

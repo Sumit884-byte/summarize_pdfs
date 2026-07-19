@@ -32,6 +32,7 @@ class SupermemoryConfig(BaseModel):
 class AppConfig(BaseModel):
     data_dir: Path = Path("data")
     raw_dir: Path | None = None  # override: e.g. /Users/you/dev/stats
+    notes_dir: Path | None = None  # study guides & notes (default: data_dir/output)
     collection_name: str = "textbook_chunks"
     chunk_size: int = 800
     chunk_overlap: int = 120
@@ -60,6 +61,8 @@ class AppConfig(BaseModel):
 
     @property
     def output_dir(self) -> Path:
+        if self.notes_dir is not None:
+            return self.notes_dir
         return self.data_dir / "output"
 
     @property
@@ -113,6 +116,8 @@ def load_config(path: Path | None = None) -> AppConfig:
         raw["data_dir"] = Path(raw["data_dir"])
     if "raw_dir" in raw and raw["raw_dir"] is not None:
         raw["raw_dir"] = Path(raw["raw_dir"])
+    if "notes_dir" in raw and raw["notes_dir"] is not None:
+        raw["notes_dir"] = Path(raw["notes_dir"])
     config = AppConfig.model_validate(raw)
     config.ensure_dirs()
     return config

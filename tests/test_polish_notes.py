@@ -52,3 +52,25 @@ def test_render_polished_notes_preserves_topic_order():
     text = render_polished_notes(header, polished)
     assert text.index("DESCRIPTIVE STATISTICS") < text.index("PROBABILITY")
     assert header.splitlines()[0] in text
+
+
+CLUSTER_NOTES = """\
+STATISTICS FOR DATA SCIENCE — QUICK STUDY NOTES
+================================================
+
+EXAM CONCEPT CLUSTERS (from co-occurrence analysis)
+----------------------------------------------------
+• Percentile + Quartile (appears together in 11 questions)
+
+DESCRIPTIVE STATISTICS — Quick Notes
+
+Key Facts:
+• Mean is sensitive to outliers
+"""
+
+
+def test_split_study_notes_preserves_concept_cluster_preamble():
+    header, sections = split_study_notes_by_topic(CLUSTER_NOTES)
+    assert "EXAM CONCEPT CLUSTERS" in header
+    assert "Percentile + Quartile" in header
+    assert "Descriptive Statistics" in sections

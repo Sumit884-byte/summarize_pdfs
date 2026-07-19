@@ -20,6 +20,8 @@ _TOPIC_HEADER_RE = re.compile(r"^(.+?) — Quick Notes\s*$")
 _BULLET_START_RE = re.compile(r"^(?:•|\s+where\b)", re.I)
 _WHERE_LINE_RE = re.compile(r"^\s*where\b", re.I)
 _SECTION_HEADER_RE = re.compile(r"^(?:Key Facts|Formulas):\s*$", re.I)
+_CLUSTER_HEADER_RE = re.compile(r"^EXAM CONCEPT CLUSTERS", re.I)
+_CLUSTER_LINE_RE = re.compile(r"^-+$")
 
 
 def _extract_polished_text(data: object) -> str:
@@ -80,6 +82,17 @@ def _match_topic(header_label: str) -> str:
     return header_label.strip()
 
 
+def _is_cluster_section_line(line: str, *, in_cluster: bool) -> bool:
+    stripped = line.strip()
+    if _CLUSTER_HEADER_RE.match(stripped):
+        return True
+    if not in_cluster:
+        return False
+    if not stripped or stripped.startswith("•") or _CLUSTER_LINE_RE.match(stripped):
+        return True
+    return False
+
+
 def split_study_notes_by_topic(notes_text: str) -> tuple[str, dict[str, str]]:
     """Split study notes into document header and topic sections."""
     lines = notes_text.splitlines()
@@ -105,14 +118,28 @@ def split_study_notes_by_topic(notes_text: str) -> tuple[str, dict[str, str]]:
         sections[current_topic] = "\n".join(current_lines).strip()
 
     preamble: list[str] = []
+    cluster_block: list[str] = []
     orphan_content: list[str] = []
+    in_cluster = False
     for line in doc_header_lines:
+        if _is_cluster_section_line(line, in_cluster=in_cluster):
+            in_cluster = True
+            cluster_block.append(line)
+            continue
+        if in_cluster:
+            preamble.extend(cluster_block)
+            cluster_block = []
+            in_cluster = False
+
         if _BULLET_START_RE.match(line):
             orphan_content.append(line)
         elif orphan_content:
             orphan_content.append(line)
         else:
             preamble.append(line)
+
+    if cluster_block:
+        preamble.extend(cluster_block)
 
     if orphan_content and "Descriptive Statistics" not in sections:
         label = _short_topic_label("Descriptive Statistics")

@@ -16,7 +16,8 @@ from summarize_pdfs.models import ConceptExtraction, ConceptItem, ExamQuestion
 def test_quality_standards_include_plaintext_rules():
     assert "×" in PLAINTEXT_OUTPUT_RULES
     assert "where_clause" in QUALITY_STANDARDS or "where" in QUALITY_STANDARDS.lower()
-    assert "FORMULA AWARENESS" in QUALITY_STANDARDS or "formula-backed" in QUALITY_STANDARDS.lower()
+    assert "DEDUPLICATION" in QUALITY_STANDARDS or "duplicate" in QUALITY_STANDARDS.lower()
+    assert "fluid" in QUALITY_STANDARDS.lower() or "merge" in QUALITY_STANDARDS.lower()
 
 
 def test_system_json_includes_quality():
@@ -80,10 +81,18 @@ def test_exam_parse_skips_boilerplate():
 def test_polish_prompt_includes_rules():
     prompt = polish_notes_prompt("• Def: P(D|B): conditional", "Probability & Conditional Probability")
     assert "polished_text" in prompt
-    assert "Bayes" in prompt or "cross-link" in prompt.lower()
+    assert "merge" in prompt.lower() or "deduplicate" in prompt.lower()
     assert "where" in prompt.lower()
-    assert "formula-backed" in prompt.lower() or "percentile" in prompt.lower()
     assert "Probability & Conditional Probability" in prompt
+
+
+def test_polish_prompt_merges_duplicate_definitions():
+    prompt = polish_notes_prompt(
+        "• Def: mean: average\n• Def: mean: the average value\n• Def: Mean: arithmetic mean",
+        "Descriptive Statistics",
+    )
+    assert "ONE" in prompt or "one" in prompt.lower()
+    assert "merge" in prompt.lower() or "duplicate" in prompt.lower()
 
 
 def test_polish_system_includes_quick_notes():

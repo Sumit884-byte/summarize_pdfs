@@ -19,12 +19,21 @@ PLAIN TEXT OUTPUT (mandatory):
 
 VOICE_AND_STRUCTURE_RULES = """
 VOICE AND STRUCTURE:
-- Write cohesive study notes organized by statistical topic — NOT per-question Q&A dumps.
+- Write fluid, readable study notes — like a concise textbook section, not a dump of fragments.
+- Organize by statistical topic; connect related ideas in natural prose where a bullet can carry a full thought.
 - Do NOT use headers like "QUESTION N", "CONCEPTS", "SOURCE EVIDENCE", or numbered mechanical steps.
 - Skip hall-ticket confirmations, section metadata, and placeholder instructions.
-- Preserve ALL facts, formulas, definitions, and notation from source excerpts — be exhaustive, not terse.
-- Prefer textbook/OpenStax definitions from provided excerpts over invented paraphrases.
-- Mark content not found in excerpts as (standard) rather than hallucinating.
+- Draw content from provided excerpts; mark anything not in excerpts as (standard).
+- Prefer one clear statement over three near-duplicates saying the same thing.
+""".strip()
+
+DEDUPLICATION_RULES = """
+DEDUPLICATION AND MERGING (mandatory):
+- ONE definition per concept. If mean, median, or any term appears multiple times with slightly different wording, merge into a single best definition.
+- Do NOT repeat the same formula in different wording — keep the clearest version with a complete where_clause.
+- Combine overlapping facts into one bullet when they express the same idea (e.g. "mean is average" + "mean = sum/n" → one bullet with definition AND formula).
+- Remove near-duplicates before output; err on fewer, richer bullets rather than many redundant ones.
+- Def: lines must not restate what a formula bullet already says — pick definition OR formula+where, not both unless they add distinct information.
 """.strip()
 
 FORMULA_RULES = """
@@ -36,44 +45,36 @@ FORMULAS (mandatory for every formula):
 """.strip()
 
 FORMULA_AWARENESS = """
-FORMULA AWARENESS (mandatory):
-- If you name ANY statistical concept that has a standard formula, ALWAYS pair it with that formula.
-- Never give a bare definition without the formula when a standard formula exists.
-- Set has_formula: true on every concept/definition that has a standard formula; include the formula in formulas[].
-- Trigger concepts (always include formula when mentioned):
-  percentile, quartile, Q1, Q2, Q3, median, mean, mode, range, variance, standard deviation, SD,
-  sample variance, sample standard deviation, correlation, Pearson correlation, probability,
-  conditional probability, combination, permutation, Bayes, Bayes' theorem, z-score, IQR,
-  interquartile range, expected value, complement rule, cumulative frequency.
-- Examples:
-  percentile → i = (p/100) × n (with where_clause for i, p, n)
-  median → middle value rule (odd n: middle; even n: average of two middle values)
-  variance → σ² = Σ(xi - μ)² / N
-  standard deviation → σ = √(variance)
-  correlation → r = Σ[(xi - x̄)(yi - ȳ)] / [(n-1) × sx × sy]
-  z-score → z = (x - μ) / σ
-  Bayes → P(A|B) = P(B|A) × P(A) / P(B)
-  combinations → C(n, k) = n! / (k! × (n - k)!)
-  IQR → IQR = Q3 - Q1
+FORMULA AWARENESS:
+- When a concept has a standard formula, pair the definition with that formula (once, not repeatedly).
+- Trigger concepts: percentile, quartile, median, mean, mode, range, variance, standard deviation,
+  correlation, probability, conditional probability, combination, permutation, Bayes, z-score, IQR.
+- When discussing linear transforms (adding b or multiplying by c), state effects on mean, median, AND spread together in connected prose.
 """.strip()
 
 DEFINITION_RULES = """
 DEFINITIONS:
 - Write complete full-sentence definitions — NEVER truncate with "..." or ellipses.
-- Each definition must stand alone as a proper sentence ending with a period.
+- Each definition must stand alone; merge duplicate defs for the same term into one authoritative sentence.
+- When a term has conditions (e.g. mean only for quantitative data, not categorical), include those conditions in the same definition.
 """.strip()
 
 FACTS_RULES = """
-BRANCH FACTS (mandatory per topic):
-- Include facts[]: short factual statements about the statistical branch — NOT formulas, NOT definitions.
-- Facts describe properties, relationships, conditions, and exam-relevant truths for the topic.
-- Examples of facts (not formulas):
-  • Mean is sensitive to outliers; median is robust
-  • Probability always ranges from 0 to 1
-  • Order matters → permutation; order doesn't → combination
-  • Correlation measures association, not causation
+BRANCH FACTS (from excerpts — do not invent):
+- facts[] holds short property/relationship statements for the topic — NOT formulas, NOT term definitions.
+- Read the textbook excerpts carefully and extract facts the text actually states or clearly implies.
+- Look for: scope conditions (when a measure applies or does not), relationships between concepts,
+  branches of the field (descriptive vs inferential), behavior under data transforms, exam-relevant contrasts.
+- Write each fact as a complete, fluid sentence — not a telegraphic fragment.
 - Do NOT put formulas in facts[] — use formulas[] for expressions with = signs.
-- Do NOT put one-line term definitions in facts[] — use definitions[] for those.
+""".strip()
+
+CONCEPTUAL_COVERAGE = """
+CONCEPTUAL COVERAGE (extract from excerpts when the topic touches these areas — do not skip if the text supports it):
+- Branches of statistics: descriptive (summarize observed data) vs inferential (conclude about populations from samples).
+- Applicability: which measures of center/spread apply to which data types (e.g. mean requires numeric data; categorical data uses mode).
+- Transforms: how adding a constant or multiplying all values affects center (mean, median) and spread (SD, variance).
+Only include points backed by the provided excerpts or clearly standard textbook knowledge; mark (standard) if not quoted.
 """.strip()
 
 FULL_SUMMARY_RULES = """
@@ -81,12 +82,14 @@ FULL SUMMARY MODE (study_guide_complete.txt):
 - Topic-organized prose with definitions, formulas (verbatim), and conceptual reasoning.
 - NO worked step-by-step calculations with numbers plugged in.
 - Explain WHY and HOW concepts apply, not numeric walkthroughs.
+- Merge duplicate definitions; write flowing paragraphs in summary_paragraph.
 """.strip()
 
 QUICK_NOTES_RULES = """
 QUICK NOTES MODE (study_notes.txt):
-- Formulas with where_clauses, one-line definitions, and exam tricks only.
+- Formulas with where_clauses, merged one-line definitions, and exam tricks only.
 - NO worked examples, NO numeric calculations, NO multi-step numeric solutions.
+- Fewer, denser bullets — each bullet should carry maximum information without repetition.
 """.strip()
 
 BOILERPLATE_SKIP_RULES = """
@@ -99,10 +102,12 @@ QUALITY_STANDARDS = "\n\n".join(
     [
         PLAINTEXT_OUTPUT_RULES,
         VOICE_AND_STRUCTURE_RULES,
+        DEDUPLICATION_RULES,
         FORMULA_RULES,
         FORMULA_AWARENESS,
         DEFINITION_RULES,
         FACTS_RULES,
+        CONCEPTUAL_COVERAGE,
         FULL_SUMMARY_RULES,
         QUICK_NOTES_RULES,
         BOILERPLATE_SKIP_RULES,
@@ -129,6 +134,8 @@ SYSTEM_CONCEPT_EXTRACTION = (
     + "\n\n"
     + VOICE_AND_STRUCTURE_RULES
     + "\n\n"
+    + DEDUPLICATION_RULES
+    + "\n\n"
     + FORMULA_AWARENESS
 )
 
@@ -142,18 +149,20 @@ SYSTEM_EXAM_PARSE = (
 
 SYSTEM_EXPAND = (
     "You are expanding exam study notes using textbook excerpts as ground truth. "
+    "Merge duplicates, write fluid prose, and deduplicate before returning JSON. "
     "Always respond with valid JSON only.\n\n"
     + QUALITY_STANDARDS
 )
 
 POLISH_NOTES_SYSTEM = (
-    "You are an expert statistics exam-prep editor polishing quick-reference study notes. "
+    "You are an expert statistics exam-prep editor. "
+    "Your job is to deduplicate, merge, and polish study notes into fluid readable reference material. "
     "Always respond with valid JSON only.\n\n"
     + PLAINTEXT_OUTPUT_RULES
     + "\n\n"
-    + FORMULA_RULES
+    + DEDUPLICATION_RULES
     + "\n\n"
-    + FORMULA_AWARENESS
+    + FORMULA_RULES
     + "\n\n"
     + DEFINITION_RULES
     + "\n\n"
@@ -207,10 +216,9 @@ Rules:
 - If the question requires combining multiple distinct concepts, group them in co_occurring_groups.
 - Each co_occurring_groups entry must list 2+ concept names that must be used together for this question.
 - Use concept names that match the concepts[].name labels where possible.
-- Definitions must be complete sentences (no truncation).
+- One definition per concept — no duplicate labels for the same idea.
 - Set has_formula: true for every concept with a standard formula (percentile, median, variance, etc.).
 - When has_formula is true, formulas MUST be non-empty with the standard expression and implied variables.
-- Never list a formula-backed concept with an empty formulas array.
 {FORMULA_AWARENESS}
 {PLAINTEXT_OUTPUT_RULES}
 
@@ -253,12 +261,12 @@ Return JSON:
 {{
   "skip": false,
   "facts": [
-    "short branch-level factual statement — properties, conditions, relationships (NOT formulas)"
+    "fluid factual sentence drawn from excerpts — properties, conditions, relationships (NOT formulas)"
   ],
   "definitions": [
     {{
       "name": "term",
-      "text": "complete full-sentence definition from excerpts",
+      "text": "single merged full-sentence definition from excerpts",
       "has_formula": true
     }}
   ],
@@ -277,10 +285,9 @@ Return JSON:
 
 Rules:
 {QUALITY_STANDARDS}
-- Include facts[] with 2-5 branch-relevant factual statements drawn from excerpts.
+- Extract facts[] from excerpts; include scope, branches, and transform behavior when the text supports it.
+- Merge duplicate definitions for the same term into one entry in definitions[].
 - Do NOT include worked step-by-step calculations with specific numbers.
-- Do NOT use Q&A-style headers or per-question dump formatting in explanation.
-- List every formula, definition, and fact needed — err on completeness.
 - Every definition with has_formula: true MUST have a matching entry in formulas[] with where_clause.
 - Prefer quoting source text verbatim over paraphrasing.
 """
@@ -298,7 +305,7 @@ def expand_topic_user_prompt(
 Topic: {topic}
 Textbook: {textbook_name}
 
-Existing exam-derived notes (fix errors using textbook):
+Existing exam-derived notes (deduplicate and fix errors using textbook):
 {existing_notes or "(none yet)"}
 
 Textbook excerpts:
@@ -307,10 +314,10 @@ Textbook excerpts:
 Return JSON:
 {{
   "facts": [
-    {{"text": "branch-level factual statement (not a formula or definition)", "page": 123}}
+    {{"text": "fluid factual sentence from excerpts (not a formula or definition)", "page": 123}}
   ],
   "definitions": [
-    {{"name": "term", "text": "complete full-sentence definition", "page": 123}}
+    {{"name": "term", "text": "single merged full-sentence definition", "page": 123}}
   ],
   "formulas": [
     {{
@@ -326,17 +333,17 @@ Return JSON:
   "corrections": [
     "Explain errors in existing notes and the textbook-correct version"
   ],
-  "summary_paragraph": "2-4 sentence textbook-backed overview citing pages like (p. 45)"
+  "summary_paragraph": "2-4 fluent sentences weaving the topic together — cite pages like (p. 45); no repetition of bullet content"
 }}
 
 Rules:
 {QUALITY_STANDARDS}
-- Include facts[] with 3-6 branch-level factual statements from textbook excerpts (properties, conditions, key truths).
-- Use textbook excerpts as authoritative; fix wrong formulas.
+- Read excerpts thoroughly; extract facts the textbook states about scope, branches, data types, and transforms.
+- Merge any duplicate definitions in existing notes + new material into ONE definition per term.
+- Do NOT repeat the same idea in facts[], definitions[], and summary_paragraph — each layer adds new value or merge them.
+- Use textbook excerpts as authoritative; fix wrong formulas in existing notes.
 - Always include page numbers from excerpts.
-- Quick-notes fields: formulas + tricks + one-line defs only — no worked examples.
-- Full-summary fields: definitions + formulas + conceptual summary_paragraph — no numeric walkthroughs.
-- If a definition names a formula-backed concept (percentile, median, variance, etc.), include its formula.
+- If existing notes repeat mean/median/mode definitions, consolidate into one clear definition each.
 """
 
 
@@ -345,7 +352,7 @@ def polish_notes_prompt(chunk_text: str, topic_name: str) -> str:
 
 Topic: {topic_name}
 
-Input section (may contain duplicates, awkward phrasing, or missing cross-links):
+Input section (likely contains duplicates, repetitive definitions, and awkward phrasing):
 {chunk_text}
 
 Return JSON:
@@ -353,26 +360,28 @@ Return JSON:
   "polished_text": "full polished section text including the topic header line"
 }}
 
-Polish rules:
-- Merge duplicate formulas, definitions, and facts (keep the clearest, most complete version).
-- Preserve a "Key Facts:" subsection with branch-level factual bullets (not formulas).
-- Preserve a "Formulas:" subsection with formula bullets and where-clauses.
-- Improve clarity and flow while preserving EVERY fact, formula, trick, and page citation.
-- Every formula MUST keep or add a where-clause defining ALL variables on the next line
-  (indented with two spaces, starting with "where ").
-- If a Def: line names a formula-backed concept (percentile, median, variance, correlation, etc.)
-  but no formula bullet exists nearby, ADD the standard formula with where-clause.
-- Never leave formula-backed concepts as bare definitions — pair Def: with • formula lines.
-{FORMULA_AWARENESS}
-- Add brief cross-links where helpful (e.g. P(D|B) relates to Bayes' theorem, conditional probability).
-- Compact cheat-sheet style: section headers "Key Facts:" and "Formulas:" then bullet lines.
-- Bullet lines starting with • for formulas; Def:, Trick:, Fix: for other items.
-- NO worked examples, NO numeric step-by-step calculations, NO multi-step numeric solutions.
+Polish rules — DEDUPLICATE AND MERGE FIRST:
+- If the same concept (mean, median, mode, probability, etc.) has multiple Def: lines or fact bullets saying the same thing, keep ONE best version and delete the rest.
+- Merge overlapping facts into a single richer bullet (e.g. combine "mean is sensitive to outliers" with "median is robust" into one connected sentence when they contrast).
+- Do NOT list the same formula twice in different notation — keep the clearest with a complete where-clause.
+- Remove Def: lines that merely restate a formula already in the Formulas: section unless the definition adds conditions (e.g. when mean applies vs does not).
+
+Polish rules — FLUID WRITING:
+- Each Key Facts bullet should read as a complete, natural sentence — not a telegraphic fragment.
+- Connect related ideas: branches of statistics, data-type applicability, transform effects on center and spread.
+- Write like a concise study guide a student would actually want to read, not a raw extraction dump.
+
+Polish rules — STRUCTURE:
+- Start with: "{topic_name.split(' (')[0].upper()} — Quick Notes" then a blank line.
+- "Key Facts:" — 3-6 deduplicated bullets (fewer is fine if merged well).
+- Blank line, then "Formulas:" — deduplicated formula bullets with where-clauses on the next line (indented two spaces, starting with "where ").
+- Then any remaining Def:/Trick:/Fix: bullets that add information not already covered above.
 - Keep textbook page citations like [p.217] when present.
-- Start the section with: "{topic_name.split(' (')[0].upper()} — Quick Notes" then a blank line.
-- Then "Key Facts:" subsection (3-6 bullets), blank line, "Formulas:" subsection, then Def:/Trick: bullets.
-- Output plain text inside polished_text — use × for multiplication, … for ellipsis, no LaTeX or escapes.
-- Do NOT drop content; err on completeness over brevity.
+- NO worked examples, NO numeric step-by-step calculations.
+- Output plain text inside polished_text — use × for multiplication, no LaTeX or escapes.
+- Preserve every DISTINCT fact, formula, and trick — but merged, not repeated.
+{DEDUPLICATION_RULES}
+{CONCEPTUAL_COVERAGE}
 """
 
 
